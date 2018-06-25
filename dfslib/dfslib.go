@@ -54,3 +54,23 @@ type LocalPathError string
 func (e LocalPathError) Error() string {
 	return fmt.Sprintf("DFS: Cannot access local path [%s]", string(e))
 }
+
+// A user is identified by their IP and path
+type UserRegistrationError string
+
+func (e UserRegistrationError) Error() string {
+	return fmt.Sprintf("server: The user: [%s] is already registered", string(e))
+}
+
+//==================================================================
+// The client exposes an interface to the server. The server may
+// invoke this interface to request information and data such as
+// files stored locally on client or a specific chunk value.
+// Client and server communicate via bi-directional RPC calls
+//==================================================================
+
+type ClientRPC int
+
+type ClientInterface interface {
+	Ping(stub int, reply *bool) (err error)
+}
