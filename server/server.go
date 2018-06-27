@@ -7,12 +7,13 @@ package main
 import (
 	"fmt"
 	"net"
-	"net/rpc"
+	rpc "net/rpc"
 	"os"
+	"time"
 )
 
 const (
-	hbInterval = 2000 // defines heartbeat interval in milliseconds
+	hbInterval = 5000 // defines heartbeat interval in milliseconds
 )
 
 type FileMode int
@@ -27,9 +28,11 @@ const (
 
 var (
 	ipPort          string
-	files           map[string]FileState // Assumption: each file name is unique as namespace is global
-	filesOpened     map[UserInfo]map[string]FileMode
+	files           map[string]FileState             // Assumption: each file name is unique as namespace is global
+	filesOpened     map[UserInfo]map[string]FileMode // Assumption: files cannot be deleted after opening
 	registeredUsers []UserInfo
+	rpcConnections  []net.Conn
+	lastHeartBeat   map[UserInfo]time.Time
 )
 
 type FileState struct {
@@ -53,13 +56,15 @@ type ServerInterface interface {
 	Ping(stub int, reply *bool) (err error)
 	Register(user UserInfo, reply *bool) (err error)
 	Unregister(stub int, reply *bool) (err error)
-	SendHeartbeat(stub int, reply *bool) (err error)
+	SendHeartbeat(user UserInfo, reply *bool) (err error)
 }
 
 func main() {
 	args := os.Args[1:]
 	fmt.Println("args: ", args)
 	ipPort = args[0]
+
+	lastHeartBeat = make(map[UserInfo]time.Time, 0)
 
 	server := new(ServerRPC)
 	serverRPC := rpc.NewServer()
@@ -73,19 +78,36 @@ func main() {
 
 	for {
 		conn, _ := listener.Accept()
+		rpcConnections = append(rpcConnections, conn)
+		fmt.Println("conns: ", rpcConnections)
 		go serverRPC.ServeConn(conn)
 	}
-
 }
 
 //==================================================================
-// Monitor reaps registered users who have either
+// Monitor reaps a user if it
 // (1) failed to send a heartbeat or
-// (2) sent a late heartbeat
+// (2) sent a late heartbeat (> 2 seconds)
 //==================================================================
 
-func monitor() {
+func monitor(user UserInfo) {
+	for {
+		timeBetween := time.Now().Sub(lastHeartBeat[user])
+		if timeBetween > hbInterval*time.Millisecond {
+			reap(user)
+			break
+		} else {
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
 
+func reap(user UserInfo) {
+	fmt.Printf("server: [%s] disconnected due to late heartbeat\n", user)
+	removeUser(user)
+	disconnectUser(user)
+	fmt.Println("Users: ", registeredUsers) // TODO:
+	fmt.Println("Conns: ", rpcConnections)  // TODO:
 }
 
 //==================================================================
@@ -100,22 +122,24 @@ func (s *ServerRPC) Ping(stub int, reply *bool) (err error) {
 func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 	if !containsUser(user, registeredUsers) {
 		registeredUsers = append(registeredUsers, user)
+		lastHeartBeat[user] = time.Now()
+		go monitor(user)
 		*reply = true
-		fmt.Println("@@")
-		fmt.Println(registeredUsers)
-		fmt.Println("@@")
 		return nil
 	}
 
 	*reply = false
-	return UserRegistrationError(user.LocalIP + " & " + user.LocalPath)
+	return UserRegistrationError(user.LocalIP + " @ path " + user.LocalPath)
 }
 
 func (s *ServerRPC) Unregister(stub int, reply *bool) (err error) {
 	return nil
 }
 
-func (s *ServerRPC) SendHeartbeat(stub int, reply *bool) (err error) {
+func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
+	fmt.Println("server: Received heartbeat from: ", user)
+	lastHeartBeat[user] = time.Now()
+	*reply = true
 	return nil
 }
 
@@ -132,11 +156,40 @@ func containsUser(user UserInfo, regUsers []UserInfo) bool {
 	return false
 }
 
-func removeUser(user UserInfo, regUsers []UserInfo) {
-	for i, regUser := range regUsers {
+func removeUser(user UserInfo) {
+	arrLen := len(registeredUsers)
+
+	for i, regUser := range registeredUsers {
 		if userEquals(user, regUser) {
-			regUsers[i] = regUsers[len(regUsers)-1]
-			regUsers = regUsers[:len(regUsers)-1]
+			if arrLen == 1 {
+				registeredUsers = make([]UserInfo, 0)
+				break
+			}
+
+			registeredUsers[i] = registeredUsers[arrLen-1]
+			registeredUsers = registeredUsers[:arrLen-1]
+			break
+		}
+	}
+}
+
+func disconnectUser(user UserInfo) {
+	arrLen := len(rpcConnections)
+
+	for i, conn := range rpcConnections {
+		fmt.Println("Inside DisconnectUser")
+		fmt.Println("conn addr: ", conn.RemoteAddr().String())
+		fmt.Println("user LocalIP: ", user.LocalIP)
+		if user.LocalIP == conn.LocalAddr().String() {
+			conn.Close()
+
+			if arrLen == 1 {
+				registeredUsers = make([]UserInfo, 0)
+				break
+			}
+
+			registeredUsers[i] = registeredUsers[arrLen-1]
+			registeredUsers = registeredUsers[:arrLen-1]
 			break
 		}
 	}

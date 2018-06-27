@@ -6,8 +6,10 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/rpc"
 	"os"
+	"time"
 )
 
 var (
@@ -29,13 +31,13 @@ func main() {
 	myUser := UserInfo{LocalIP: clientIPPort, LocalPath: path}
 
 	client, err := rpc.Dial("tcp", serverIPPort)
+	fmt.Println(net.InterfaceAddrs())
 
 	if err != nil {
 		fmt.Println("client: Error establishing connection to server")
 	}
 
 	var reply bool
-	fmt.Println("@@")
 	err = client.Call("ServerRPC.Ping", 0, &reply)
 	if err != nil {
 		fmt.Println("client: Failed to ping server")
@@ -43,8 +45,22 @@ func main() {
 
 	var reply2 bool
 	err = client.Call("ServerRPC.Register", myUser, &reply2)
-	if err != nil {
-		fmt.Println("client: Failed to register with server")
-		fmt.Println(err.Error())
+	// err = client.Call("ServerRPC.Register", myUser, &reply2)
+	// if err != nil {
+	// 	fmt.Println("client: Failed to register with server")
+	// 	fmt.Println(err.Error())
+	// }
+	for {
+		var reply3 bool
+		fmt.Println("@@")
+		err = client.Call("ServerRPC.SendHeartbeat", myUser, &reply3)
+		fmt.Println("##")
+		if err != nil {
+			fmt.Println("client: Server did not receive heartbeat")
+			fmt.Println(err.Error()) // failure detector on client side
+			break
+		}
+		time.Sleep(time.Millisecond * 10000)
 	}
+
 }
