@@ -1,6 +1,9 @@
 /*
 	Usage:
 	go run server.go [server ip:port]
+
+	Example:
+	go run server.go 127.0.0.1:3000
 */
 package main
 
@@ -31,7 +34,6 @@ var (
 	files           map[string]FileState             // Assumption: each file name is unique as namespace is global
 	filesOpened     map[UserInfo]map[string]FileMode // Assumption: files cannot be deleted after opening
 	registeredUsers []UserInfo
-	rpcConnections  []net.Conn
 	lastHeartBeat   map[UserInfo]time.Time
 )
 
@@ -78,8 +80,6 @@ func main() {
 
 	for {
 		conn, _ := listener.Accept()
-		rpcConnections = append(rpcConnections, conn)
-		fmt.Println("conns: ", rpcConnections)
 		go serverRPC.ServeConn(conn)
 	}
 }
@@ -105,9 +105,7 @@ func monitor(user UserInfo) {
 func reap(user UserInfo) {
 	fmt.Printf("server: [%s] disconnected due to late heartbeat\n", user)
 	removeUser(user)
-	disconnectUser(user)
 	fmt.Println("Users: ", registeredUsers) // TODO:
-	fmt.Println("Conns: ", rpcConnections)  // TODO:
 }
 
 //==================================================================
@@ -137,6 +135,11 @@ func (s *ServerRPC) Unregister(stub int, reply *bool) (err error) {
 }
 
 func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
+	if !containsUser(user, registeredUsers) {
+		*reply = false
+		return HeartbeatRegistrationError(user.LocalIP + " @ path " + user.LocalPath)
+	}
+
 	fmt.Println("server: Received heartbeat from: ", user)
 	lastHeartBeat[user] = time.Now()
 	*reply = true
@@ -173,28 +176,6 @@ func removeUser(user UserInfo) {
 	}
 }
 
-func disconnectUser(user UserInfo) {
-	arrLen := len(rpcConnections)
-
-	for i, conn := range rpcConnections {
-		fmt.Println("Inside DisconnectUser")
-		fmt.Println("conn addr: ", conn.RemoteAddr().String())
-		fmt.Println("user LocalIP: ", user.LocalIP)
-		if user.LocalIP == conn.LocalAddr().String() {
-			conn.Close()
-
-			if arrLen == 1 {
-				registeredUsers = make([]UserInfo, 0)
-				break
-			}
-
-			registeredUsers[i] = registeredUsers[arrLen-1]
-			registeredUsers = registeredUsers[:arrLen-1]
-			break
-		}
-	}
-}
-
 func userEquals(u, ru UserInfo) bool {
 	return (u.LocalIP == ru.LocalIP) && (u.LocalPath == ru.LocalPath)
 }
@@ -208,4 +189,10 @@ type UserRegistrationError string
 
 func (e UserRegistrationError) Error() string {
 	return fmt.Sprintf("server: The user: [%s] is already registered", string(e))
+}
+
+type HeartbeatRegistrationError string
+
+func (e HeartbeatRegistrationError) Error() string {
+	return fmt.Sprintf("server: The user [%s] sent a heartbeat, but is not registered", string(e))
 }

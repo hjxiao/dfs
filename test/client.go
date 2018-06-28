@@ -1,6 +1,9 @@
 /*
 	Usage:
 	go run client.go [client IP:port] [server ip:port]
+
+	Example:
+	go run client.go 127.0.0.1:3001 127.0.0.1:3000
 */
 package main
 
@@ -56,11 +59,9 @@ func main() {
 		err = client.Call("ServerRPC.SendHeartbeat", myUser, &reply3)
 		fmt.Println("##")
 		if err != nil {
-			fmt.Println("client: Server did not receive heartbeat")
 			fmt.Println(err.Error()) // failure detector on client side
 			break
 		}
-		time.Sleep(time.Millisecond * 10000)
+		time.Sleep(time.Millisecond * 2500)
 	}
-
 }
