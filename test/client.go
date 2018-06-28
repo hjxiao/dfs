@@ -63,5 +63,6 @@ func main() {
 			break
 		}
 		time.Sleep(time.Millisecond * 2500)
+		err = client.Call("ServerRPC.Unregister", myUser, &reply3)
 	}
 }

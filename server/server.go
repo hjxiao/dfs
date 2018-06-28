@@ -57,7 +57,7 @@ type ServerRPC int
 type ServerInterface interface {
 	Ping(stub int, reply *bool) (err error)
 	Register(user UserInfo, reply *bool) (err error)
-	Unregister(stub int, reply *bool) (err error)
+	Unregister(user UserInfo, reply *bool) (err error)
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
 }
 
@@ -130,7 +130,10 @@ func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 	return UserRegistrationError(user.LocalIP + " @ path " + user.LocalPath)
 }
 
-func (s *ServerRPC) Unregister(stub int, reply *bool) (err error) {
+func (s *ServerRPC) Unregister(user UserInfo, reply *bool) (err error) {
+	fmt.Printf("server: Removing requested user [%s]", user)
+	removeUser(user)
+	fmt.Println("Users: ", registeredUsers)
 	return nil
 }
 
@@ -188,11 +191,11 @@ func userEquals(u, ru UserInfo) bool {
 type UserRegistrationError string
 
 func (e UserRegistrationError) Error() string {
-	return fmt.Sprintf("server: The user: [%s] is already registered", string(e))
+	return fmt.Sprintf("server: The user: [%s] is already registered\n", string(e))
 }
 
 type HeartbeatRegistrationError string
 
 func (e HeartbeatRegistrationError) Error() string {
-	return fmt.Sprintf("server: The user [%s] sent a heartbeat, but is not registered", string(e))
+	return fmt.Sprintf("server: The user [%s] sent a heartbeat, but is not registered\n", string(e))
 }
