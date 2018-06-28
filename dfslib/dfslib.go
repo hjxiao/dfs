@@ -7,7 +7,11 @@
 // access the distributed file system
 package dfslib
 
-import "fmt"
+import (
+	"fmt"
+	"net"
+	"os"
+)
 
 // Files are accessed in chunks of 32 bytes.
 // Each file consists of 256 chunks.
@@ -23,6 +27,11 @@ const (
 	DREAD FileMode = 3
 )
 
+var (
+	theDFSInstance DFS // singleton pattern
+	connToServer   *net.Conn
+)
+
 type DFSFile interface {
 	Read(chunkNum uint8, chunk *Chunk) (err error)
 	Write(chunkNum uint8, chunk *Chunk) (err error)
@@ -36,32 +45,60 @@ type DFS interface {
 	UMountDFS() (err error)
 }
 
+type dfsObject struct {
+}
+
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
-	// TODO
-	// For now return LocalPathError
+	if checkLocalPathOK(localPath) {
+		if theDFSInstance != nil {
+			theDFSInstance = dfsObject{}
+		}
+		return theDFSInstance, nil
+	}
 	return nil, LocalPathError(localPath)
+}
+
+//================================
+// MountDFS Helper Functions
+//================================
+
+func checkLocalPathOK(localPath string) bool {
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func connectToServer(sAddr string) error {
+	client, err := net.Dial("tcp", sAddr)
+	if err != nil {
+		return err
+	}
+
+	connToServer = &client
+	return nil
 }
 
 //================================
 // IMPLEMENTATION: DFS interface
 //================================
 
-func LocalFileExists(fname string) (exists bool, err error) {
+func (dfs dfsObject) LocalFileExists(fname string) (exists bool, err error) {
 	// TODO:
 	return false, NotImplementedError("DFS.LocalFileExists")
 }
 
-func GlobalFileExists(fname string) (exists bool, err error) {
+func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
 	// TODO:
 	return false, NotImplementedError("DFS.GlobalFileExists")
 }
 
-func Open(fname string, mode FileMode) (f DFSFile, err error) {
+func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	// TODO:
 	return nil, NotImplementedError("DFS.UMountDFS")
 }
 
-func UMountDFS() (err error) {
+func (dfs dfsObject) UMountDFS() (err error) {
 	// TODO:
 	return NotImplementedError("DFS.UMountDFS")
 }
@@ -94,7 +131,7 @@ func Close() (err error) {
 type UserRegistrationError string
 
 func (e UserRegistrationError) Error() string {
-	return fmt.Sprintf("server: The user: [%s] is already registered", string(e))
+	return fmt.Sprintf("dfs: The user: [%s] is already registered on server", string(e))
 }
 
 // Contains chunkNum that is unavailable
