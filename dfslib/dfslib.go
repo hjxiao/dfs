@@ -53,7 +53,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		if theDFSInstance != nil {
 			theDFSInstance = dfsObject{}
 		}
-		return theDFSInstance, nil
+		return theDFSInstance, connectToServer(serverAddr)
 	}
 	return nil, LocalPathError(localPath)
 }
@@ -70,12 +70,15 @@ func checkLocalPathOK(localPath string) bool {
 }
 
 func connectToServer(sAddr string) error {
-	client, err := net.Dial("tcp", sAddr)
-	if err != nil {
-		return err
+	if connToServer == nil {
+		client, err := net.Dial("tcp", sAddr)
+		if err != nil {
+			return err
+		}
+
+		connToServer = &client
 	}
 
-	connToServer = &client
 	return nil
 }
 
