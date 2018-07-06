@@ -25,8 +25,6 @@ type FileMode int
 const (
 	READ  FileMode = 1
 	WRITE FileMode = 2
-	// Disconnected read is currently not supported
-	DREAD FileMode = 3
 )
 
 var (
@@ -74,7 +72,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", ipPort)
 	if err != nil {
-		fmt.Printf("server: Unable to bind to port [%s] to listen for incoming connection requests", ipPort)
+		fmt.Printf("server: Unable to bind to port [%s] to listen for incoming connection requests\n", ipPort)
 		os.Exit(0)
 	}
 
@@ -105,7 +103,7 @@ func monitor(user UserInfo) {
 func reap(user UserInfo) {
 	fmt.Printf("server: [%s] disconnected due to late heartbeat\n", user)
 	removeUser(user)
-	fmt.Println("Users: ", registeredUsers) // TODO:
+	fmt.Println("Users: ", registeredUsers)
 }
 
 //==================================================================
@@ -122,6 +120,7 @@ func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 		registeredUsers = append(registeredUsers, user)
 		lastHeartBeat[user] = time.Now()
 		go monitor(user)
+		fmt.Println("server: Received register from ", user)
 		*reply = true
 		return nil
 	}
@@ -131,7 +130,7 @@ func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 }
 
 func (s *ServerRPC) Unregister(user UserInfo, reply *bool) (err error) {
-	fmt.Printf("server: Removing requested user [%s]", user)
+	fmt.Printf("server: Removing requested user [%s]\n", user)
 	removeUser(user)
 	fmt.Println("Users: ", registeredUsers)
 	return nil

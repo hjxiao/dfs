@@ -9,8 +9,9 @@ package dfslib
 
 import (
 	"fmt"
-	"net"
+	"net/rpc"
 	"os"
+	"time"
 )
 
 // Files are accessed in chunks of 32 bytes.
@@ -27,9 +28,13 @@ const (
 	DREAD FileMode = 3
 )
 
+const (
+	hbInterval = 5000 // defines heartbeat interval in milliseconds
+)
+
 var (
 	theDFSInstance DFS // singleton pattern
-	connToServer   *net.Conn
+	connToServer   *rpc.Client
 )
 
 type DFSFile interface {
@@ -48,12 +53,19 @@ type DFS interface {
 type dfsObject struct {
 }
 
+type UserInfo struct {
+	LocalIP   string
+	LocalPath string
+}
+
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
 	if checkLocalPathOK(localPath) {
-		if theDFSInstance != nil {
+		if theDFSInstance == nil {
 			theDFSInstance = dfsObject{}
 		}
-		return theDFSInstance, connectToServer(serverAddr)
+
+		user := UserInfo{LocalIP: localIP, LocalPath: localPath}
+		return theDFSInstance, connectToServer(serverAddr, user)
 	}
 	return nil, LocalPathError(localPath)
 }
@@ -69,17 +81,38 @@ func checkLocalPathOK(localPath string) bool {
 	return true
 }
 
-func connectToServer(sAddr string) error {
+func connectToServer(sAddr string, user UserInfo) error {
 	if connToServer == nil {
-		client, err := net.Dial("tcp", sAddr)
+		client, err := rpc.Dial("tcp", sAddr)
 		if err != nil {
 			return err
 		}
 
-		connToServer = &client
+		connToServer = client
+		reply := false
+		err = connToServer.Call("ServerRPC.Register", user, &reply)
+		if err != nil || reply == false {
+			return err
+		}
+
+		go keepAlive(user)
 	}
 
 	return nil
+}
+
+func keepAlive(user UserInfo) {
+	fmt.Println("Inside keepAlive")
+	for {
+		reply := false
+		err := connToServer.Call("ServerRPC.SendHeartbeat", user, &reply)
+		if err != nil {
+			fmt.Println("keep alive ", err.Error())
+			break
+		}
+
+		time.Sleep(time.Millisecond * hbInterval / 2)
+	}
 }
 
 //================================
@@ -102,8 +135,8 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 }
 
 func (dfs dfsObject) UMountDFS() (err error) {
-	// TODO:
-	return NotImplementedError("DFS.UMountDFS")
+	fmt.Println("Inside UMountDFS")
+	return nil
 }
 
 //===================================
@@ -134,7 +167,7 @@ func Close() (err error) {
 type UserRegistrationError string
 
 func (e UserRegistrationError) Error() string {
-	return fmt.Sprintf("dfs: The user: [%s] is already registered on server", string(e))
+	return fmt.Sprintf("dfs: The user: [%s] is unable to register to server", string(e))
 }
 
 // Contains chunkNum that is unavailable
