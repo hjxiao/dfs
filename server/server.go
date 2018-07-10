@@ -12,6 +12,7 @@ import (
 	"net"
 	rpc "net/rpc"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -29,7 +30,7 @@ const (
 
 var (
 	ipPort          string
-	files           map[string]FileState             // Assumption: each file name is unique as namespace is global
+	files           map[string]FileState             // Assumption: global namespace, all file names are unique
 	filesOpened     map[UserInfo]map[string]FileMode // Assumption: files cannot be deleted after opening
 	registeredUsers []UserInfo
 	lastHeartBeat   map[UserInfo]time.Time
@@ -37,7 +38,8 @@ var (
 
 type FileState struct {
 	fileExists   bool
-	chunkVersion [256]FileVersionOwners // All chunks initialized at version 0; each write increments by 1
+	writeAccess  *sync.Mutex
+	chunkVersion []*FileVersionOwners // All chunks initialized at version 0; each write increments by 1
 }
 
 type FileVersionOwners struct {
@@ -64,6 +66,8 @@ func main() {
 	fmt.Println("args: ", args)
 	ipPort = args[0]
 
+	files = make(map[string]FileState, 0)
+	filesOpened = make(map[UserInfo]map[string]FileMode, 0)
 	lastHeartBeat = make(map[UserInfo]time.Time, 0)
 
 	server := new(ServerRPC)

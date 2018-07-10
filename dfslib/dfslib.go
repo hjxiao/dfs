@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -35,6 +36,7 @@ const (
 var (
 	theDFSInstance DFS // singleton pattern
 	connToServer   *rpc.Client
+	myUser         UserInfo
 )
 
 type DFSFile interface {
@@ -64,8 +66,8 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 			theDFSInstance = dfsObject{}
 		}
 
-		user := UserInfo{LocalIP: localIP, LocalPath: localPath}
-		return theDFSInstance, connectToServer(serverAddr, user)
+		myUser = UserInfo{LocalIP: localIP, LocalPath: localPath}
+		return theDFSInstance, connectToServer(serverAddr, myUser)
 	}
 	return nil, LocalPathError(localPath)
 }
@@ -102,12 +104,13 @@ func connectToServer(sAddr string, user UserInfo) error {
 }
 
 func keepAlive(user UserInfo) {
-	fmt.Println("Inside keepAlive")
 	for {
 		reply := false
 		err := connToServer.Call("ServerRPC.SendHeartbeat", user, &reply)
-		if err != nil {
-			fmt.Println("keep alive ", err.Error())
+		if err != nil || reply == false {
+			// TODO: failure detector is implemented here
+			errMsg := strings.TrimSuffix(err.Error(), "\n")
+			fmt.Printf("dfslib: Error sending heartbeat, [%s]\n", errMsg)
 			break
 		}
 
@@ -120,8 +123,10 @@ func keepAlive(user UserInfo) {
 //================================
 
 func (dfs dfsObject) LocalFileExists(fname string) (exists bool, err error) {
-	// TODO:
-	return false, NotImplementedError("DFS.LocalFileExists")
+	path := strings.Replace(myUser.LocalPath, "/", "", 2)
+	fmt.Println("../" + path + "/" + fname)
+	exists = checkLocalPathOK("../" + path + "/" + fname)
+	return exists, nil
 }
 
 func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
@@ -135,8 +140,10 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 }
 
 func (dfs dfsObject) UMountDFS() (err error) {
-	fmt.Println("Inside UMountDFS")
-	return nil
+	reply := false
+	err = connToServer.Call("ServerRPC.Unregister", myUser, &reply)
+	theDFSInstance = nil
+	return err
 }
 
 //===================================
