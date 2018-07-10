@@ -45,6 +45,8 @@ type DFSFile interface {
 	Close() (err error)
 }
 
+type dfsFileObject struct{}
+
 type DFS interface {
 	LocalFileExists(fname string) (exists bool, err error)
 	GlobalFileExists(fname string) (exists bool, err error)
@@ -52,14 +54,19 @@ type DFS interface {
 	UMountDFS() (err error)
 }
 
-type dfsObject struct {
-}
+type dfsObject struct{}
 
 type UserInfo struct {
 	LocalIP   string
 	LocalPath string
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
 	if checkLocalPathOK(localPath) {
 		if theDFSInstance == nil {
@@ -76,6 +83,12 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 // MountDFS Helper Functions
 //================================
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func checkLocalPathOK(localPath string) bool {
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
 		return false
@@ -83,6 +96,12 @@ func checkLocalPathOK(localPath string) bool {
 	return true
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func connectToServer(sAddr string, user UserInfo) error {
 	if connToServer == nil {
 		client, err := rpc.Dial("tcp", sAddr)
@@ -103,6 +122,12 @@ func connectToServer(sAddr string, user UserInfo) error {
 	return nil
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func keepAlive(user UserInfo) {
 	for {
 		reply := false
@@ -111,6 +136,7 @@ func keepAlive(user UserInfo) {
 			// TODO: failure detector is implemented here
 			errMsg := strings.TrimSuffix(err.Error(), "\n")
 			fmt.Printf("dfslib: Error sending heartbeat, [%s]\n", errMsg)
+			connToServer = nil
 			break
 		}
 
@@ -122,18 +148,36 @@ func keepAlive(user UserInfo) {
 // IMPLEMENTATION: DFS interface
 //================================
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (dfs dfsObject) LocalFileExists(fname string) (exists bool, err error) {
 	path := strings.Replace(myUser.LocalPath, "/", "", 2)
-	fmt.Println("../" + path + "/" + fname)
+	fmt.Println("dfslib: checking path ../" + path + "/" + fname)
 	exists = checkLocalPathOK("../" + path + "/" + fname)
 	return exists, nil
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
 	// TODO:
 	return false, NotImplementedError("DFS.GlobalFileExists")
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	// TODO:
 	return nil, NotImplementedError("DFS.UMountDFS")
@@ -142,28 +186,56 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 func (dfs dfsObject) UMountDFS() (err error) {
 	reply := false
 	err = connToServer.Call("ServerRPC.Unregister", myUser, &reply)
+	connToServer.Close()
+	connToServer = nil
 	theDFSInstance = nil
 	return err
 }
+
+//======================================
+// IMPLEMENTATION: DFS helper functions
+//======================================
 
 //===================================
 // IMPLEMENTATION: DFSFile Interface
 //===================================
 
-func Read(chunkNum uint8, chunk *Chunk) (err error) {
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 	// TODO:
 	return NotImplementedError("DFSFile.Read")
 }
 
-func Write(chunkNum uint8, chunk *Chunk) (err error) {
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 	// TODO:
 	return NotImplementedError("DFSFile.Write")
 }
 
-func Close() (err error) {
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (f dfsFileObject) Close() (err error) {
 	// TODO:
 	return NotImplementedError("DFSFile.Close")
 }
+
+//==========================================
+// IMPLEMENTATION: DFSFile helper functions
+//==========================================
 
 //==================================================================
 // Error handling follows go conventions of explicitly typed errors.
