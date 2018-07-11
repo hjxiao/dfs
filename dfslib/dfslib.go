@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Files are accessed in chunks of 32 bytes.
@@ -45,7 +46,10 @@ type DFSFile interface {
 	Close() (err error)
 }
 
-type dfsFileObject struct{}
+type dfsFileObject struct {
+	fd *os.File
+	fm FileMode
+}
 
 type DFS interface {
 	LocalFileExists(fname string) (exists bool, err error)
@@ -59,6 +63,11 @@ type dfsObject struct{}
 type UserInfo struct {
 	LocalIP   string
 	LocalPath string
+}
+
+type FileInfo struct {
+	user UserInfo
+	fm   FileMode
 }
 
 /*
@@ -180,21 +189,78 @@ func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
 */
 func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	// TODO:
-	return nil, NotImplementedError("DFS.UMountDFS")
+	// 1. Check file name
+	if !validFileName(fname) {
+		return nil, BadFilenameError(fname)
+	}
+	// 2. Notify server and wait for response that file is registered
+	fi := FileInfo{user: myUser, fm: mode}
+	reply := false
+	err = connToServer.Call("ServerRPC.RegisterFile", fi, &reply)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Then create dfsFileObject and return to user if new file
+	path := ".." + myUser.LocalPath + fname + ".dfs"
+	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
+	newFile, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dfsFile := dfsFileObject{fd: newFile, fm: mode}
+	// 3.1 Retrieve latest copy from other clients if pre-existing file TODO:
+
+	return dfsFile, err
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (dfs dfsObject) UMountDFS() (err error) {
 	reply := false
 	err = connToServer.Call("ServerRPC.Unregister", myUser, &reply)
 	connToServer.Close()
-	connToServer = nil
-	theDFSInstance = nil
+	connToServer, theDFSInstance = nil, nil
 	return err
 }
 
 //======================================
 // IMPLEMENTATION: DFS helper functions
 //======================================
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func validFileName(str string) bool {
+	if len(str) < 1 || len(str) > 16 {
+		return false
+	}
+
+	return isAlphaNumeric(str)
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func isAlphaNumeric(str string) bool {
+	for _, s := range str {
+		if !unicode.IsLetter(s) && !unicode.IsNumber(s) {
+			return false
+		}
+	}
+	return true
+}
 
 //===================================
 // IMPLEMENTATION: DFSFile Interface

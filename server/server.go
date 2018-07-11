@@ -36,10 +36,16 @@ var (
 	lastHeartBeat   map[UserInfo]time.Time
 )
 
+type FileInfo struct {
+	user UserInfo
+	fm   FileMode
+}
+
 type FileState struct {
-	fileExists   bool
-	writeAccess  *sync.Mutex
-	chunkVersion []*FileVersionOwners // All chunks initialized at version 0; each write increments by 1
+	fileExists       bool
+	isLockedForWrite bool
+	writeAccess      *sync.Mutex
+	chunkVersion     []*FileVersionOwners // All chunks initialized at version 0; each write increments by 1
 }
 
 type FileVersionOwners struct {
@@ -59,6 +65,7 @@ type ServerInterface interface {
 	Register(user UserInfo, reply *bool) (err error)
 	Unregister(user UserInfo, reply *bool) (err error)
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
+	RegisterFile(fi FileInfo, reply *bool) (err error)
 }
 
 func main() {
@@ -92,6 +99,12 @@ func main() {
 // (2) sent a late heartbeat (> 2 seconds)
 //==================================================================
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func monitor(user UserInfo) {
 	for {
 		timeBetween := time.Now().Sub(lastHeartBeat[user])
@@ -104,6 +117,12 @@ func monitor(user UserInfo) {
 	}
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func reap(user UserInfo) {
 	fmt.Printf("server: [%s] disconnected due to late heartbeat\n", user)
 	removeUser(user)
@@ -114,11 +133,23 @@ func reap(user UserInfo) {
 // Server interface
 //==================================================================
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (s *ServerRPC) Ping(stub int, reply *bool) (err error) {
 	fmt.Println("Received ping from client")
 	return nil
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 	if !containsUser(user, registeredUsers) {
 		registeredUsers = append(registeredUsers, user)
@@ -133,6 +164,12 @@ func (s *ServerRPC) Register(user UserInfo, reply *bool) (err error) {
 	return UserRegistrationError(user.LocalIP + " @ path " + user.LocalPath)
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (s *ServerRPC) Unregister(user UserInfo, reply *bool) (err error) {
 	fmt.Printf("server: Removing requested user [%s]\n", user)
 	removeUser(user)
@@ -140,6 +177,12 @@ func (s *ServerRPC) Unregister(user UserInfo, reply *bool) (err error) {
 	return nil
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
 	if !containsUser(user, registeredUsers) {
 		*reply = false
@@ -152,10 +195,27 @@ func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
 	return nil
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
+
+	return nil
+}
+
 //==================================================================
 // Helper Functions
 //==================================================================
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func containsUser(user UserInfo, regUsers []UserInfo) bool {
 	for _, regUser := range regUsers {
 		if userEquals(user, regUser) {
@@ -165,6 +225,12 @@ func containsUser(user UserInfo, regUsers []UserInfo) bool {
 	return false
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func removeUser(user UserInfo) {
 	arrLen := len(registeredUsers)
 
@@ -182,6 +248,12 @@ func removeUser(user UserInfo) {
 	}
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
 func userEquals(u, ru UserInfo) bool {
 	return (u.LocalIP == ru.LocalIP) && (u.LocalPath == ru.LocalPath)
 }
