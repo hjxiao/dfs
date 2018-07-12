@@ -222,7 +222,12 @@ func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
  Throws:
 */
 func (s *ServerRPC) CloseFile(fi FileInfo, reply *bool) (err error) {
-	// TODO:
+	if fi.Fmode == WRITE {
+		fs := files[fi.Name]
+		fs.isLockedForWrite = false
+		fs.writeAccess.Unlock()
+	}
+	*reply = true
 	return nil
 }
 

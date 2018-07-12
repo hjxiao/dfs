@@ -33,6 +33,9 @@ func main() {
 	const str = "Hello world!"
 	copy(c[:], str)
 	err = f.Write(0, &c)
+	fmt.Println(err.Error())
+
+	err = f.Close()
 	exitOnError(err)
 
 	time.Sleep(7500 * time.Millisecond)
