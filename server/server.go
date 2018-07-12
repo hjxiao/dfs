@@ -67,6 +67,7 @@ type ServerInterface interface {
 	Unregister(user UserInfo, reply *bool) (err error)
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
 	RegisterFile(fi FileInfo, reply *bool) (err error)
+	CloseFile(fi FileInfo, reply *bool) (err error)
 }
 
 func main() {
@@ -211,6 +212,17 @@ func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
 	}
 
 	updateOpenedFiles(fi)
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) CloseFile(fi FileInfo, reply *bool) (err error) {
+	// TODO:
 	return nil
 }
 

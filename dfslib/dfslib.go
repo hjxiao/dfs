@@ -47,8 +47,9 @@ type DFSFile interface {
 }
 
 type dfsFileObject struct {
-	fd *os.File
-	fm FileMode
+	fd   *os.File
+	fm   FileMode
+	name string
 }
 
 type DFS interface {
@@ -197,7 +198,7 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	newFile, err := createFile(fname)
 
 	// TODO: may need to export this
-	dfsFile := dfsFileObject{fd: newFile, fm: mode}
+	dfsFile := dfsFileObject{fd: newFile, fm: mode, name: fname}
 
 	return dfsFile, err
 }
@@ -274,7 +275,7 @@ func registerFile(name string, mode FileMode) error {
  Throws:
 */
 func createFile(name string) (f *os.File, err error) {
-	path := ".." + myUser.LocalPath + name + ".dfs"
+	path := myUser.LocalPath + name + ".dfs"
 	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
 	newFile, err := os.Create(path)
 	if err != nil {
@@ -306,6 +307,8 @@ func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
  Throws:
 */
 func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
+	fmt.Println("dfslib: Write to file name ", f.fd.Name())
+	// TODO:
 	if f.fm == READ {
 		return BadFileModeError("READ")
 	}
@@ -319,8 +322,14 @@ func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
  Throws:
 */
 func (f dfsFileObject) Close() (err error) {
-	// TODO:
-	return NotImplementedError("DFSFile.Close")
+	reply := false
+	fi := FileInfo{User: myUser, Name: f.name, Fmode: f.fm}
+
+	// TODO: check connToServer not nil
+	err = connToServer.Call("ServerRPC.CloseFile", fi, &reply)
+
+	f.fd.Close()
+	return err
 }
 
 //==========================================

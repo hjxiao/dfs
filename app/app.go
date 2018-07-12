@@ -13,7 +13,7 @@ type Chunk = dfslib.Chunk
 var (
 	serverAddr = "127.0.0.1:3000"
 	myAddr     = "127.0.0.1:3001"
-	path       = "/tmp/" // The directory is assumed to exist at the same level as dfslib
+	path       = "../tmp/" // The directory is assumed to exist at the same level as dfslib
 )
 
 func main() {
