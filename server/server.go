@@ -310,9 +310,9 @@ func configureWriteAccess(fi FileInfo) error {
 func updateOpenedFiles(fi FileInfo) {
 	if filesOpened[fi.User] == nil {
 		filesOpened[fi.User] = make(map[string]FileMode, 0)
-	} else {
-		filesOpened[fi.User][fi.Name] = fi.Fmode
 	}
+
+	filesOpened[fi.User][fi.Name] = fi.Fmode
 }
 
 //==================================================================
