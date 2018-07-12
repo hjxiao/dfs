@@ -30,15 +30,16 @@ const (
 
 var (
 	ipPort          string
-	files           map[string]FileState             // Assumption: global namespace, all file names are unique
+	files           map[string]*FileState            // Assumption: global namespace, all file names are unique
 	filesOpened     map[UserInfo]map[string]FileMode // Assumption: files cannot be deleted after opening
 	registeredUsers []UserInfo
 	lastHeartBeat   map[UserInfo]time.Time
 )
 
 type FileInfo struct {
-	user UserInfo
-	fm   FileMode
+	User  UserInfo
+	Name  string
+	Fmode FileMode
 }
 
 type FileState struct {
@@ -73,7 +74,7 @@ func main() {
 	fmt.Println("args: ", args)
 	ipPort = args[0]
 
-	files = make(map[string]FileState, 0)
+	files = make(map[string]*FileState, 0)
 	filesOpened = make(map[UserInfo]map[string]FileMode, 0)
 	lastHeartBeat = make(map[UserInfo]time.Time, 0)
 
@@ -202,7 +203,32 @@ func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
  Throws:
 */
 func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
+	fmt.Println("@@1")
+	if files[fi.Name] == nil {
+		fs := FileState{fileExists: true,
+			isLockedForWrite: false,
+			writeAccess:      &sync.Mutex{},
+			chunkVersion:     make([]*FileVersionOwners, 256)}
 
+		files[fi.Name] = &fs
+	}
+	fmt.Println("@@2")
+	if fi.Fmode == WRITE {
+		if files[fi.Name].isLockedForWrite == true {
+			return OpenWriteConflictError(fi.Name)
+		}
+		files[fi.Name].isLockedForWrite = true
+		files[fi.Name].writeAccess.Lock()
+	}
+	fmt.Println("@@3")
+	if filesOpened[fi.User] == nil {
+		filesOpened[fi.User] = make(map[string]FileMode, 0)
+	} else {
+		filesOpened[fi.User][fi.Name] = fi.Fmode
+	}
+	fmt.Println("@@4")
+	fmt.Println("server: files ", files)
+	fmt.Println("server: filesOpened ", filesOpened)
 	return nil
 }
 
@@ -258,6 +284,36 @@ func userEquals(u, ru UserInfo) bool {
 	return (u.LocalIP == ru.LocalIP) && (u.LocalPath == ru.LocalPath)
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func createFileIfNotExist() {
+
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func configureWriteAccess() {
+
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func updateOpenedFiles() {
+
+}
+
 //==================================================================
 // Errors
 //==================================================================
@@ -273,4 +329,11 @@ type HeartbeatRegistrationError string
 
 func (e HeartbeatRegistrationError) Error() string {
 	return fmt.Sprintf("server: The user [%s] sent a heartbeat, but is not registered\n", string(e))
+}
+
+// Contains filename
+type OpenWriteConflictError string
+
+func (e OpenWriteConflictError) Error() string {
+	return fmt.Sprintf("DFS: Filename [%s] is opened for writing by another client", string(e))
 }

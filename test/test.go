@@ -1,11 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
 var (
-	files       map[string]FileState
+	files       map[string]*FileState
 	filesOpened map[UserInfo]map[string]FileMode
 )
 
@@ -43,9 +44,17 @@ type UserInfo struct {
 // }
 
 func main() {
-	files = make(map[string]FileState, 0)
-	filesOpened = make(map[UserInfo]map[string]FileMode, 0)
+	user := UserInfo{LocalIP: "123", LocalPath: "abc"}
+	files = make(map[string]*FileState, 0)
+	filesOpened := make(map[UserInfo]map[string]FileMode, 0)
+	fmt.Println(files["new"])
+	fmt.Println(filesOpened[user])
+	fmt.Println(filesOpened[user] == nil)
 
+	filesOpened[user] = make(map[string]FileMode, 0)
+	filesOpened[user]["file1"] = 2
+
+	fmt.Println(filesOpened[user])
 }
 
 // func main2() {

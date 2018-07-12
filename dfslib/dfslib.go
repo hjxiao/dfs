@@ -66,8 +66,9 @@ type UserInfo struct {
 }
 
 type FileInfo struct {
-	user UserInfo
-	fm   FileMode
+	User  UserInfo
+	Name  string
+	Fmode FileMode
 }
 
 /*
@@ -138,7 +139,7 @@ func connectToServer(sAddr string, user UserInfo) error {
  Throws:
 */
 func keepAlive(user UserInfo) {
-	for {
+	for connToServer != nil {
 		reply := false
 		err := connToServer.Call("ServerRPC.SendHeartbeat", user, &reply)
 		if err != nil || reply == false {
@@ -146,7 +147,6 @@ func keepAlive(user UserInfo) {
 			errMsg := strings.TrimSuffix(err.Error(), "\n")
 			fmt.Printf("dfslib: Error sending heartbeat, [%s]\n", errMsg)
 			connToServer = nil
-			break
 		}
 
 		time.Sleep(time.Millisecond * hbInterval / 2)
@@ -187,21 +187,20 @@ func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
  Returns
  Throws:
 */
+// TODO: if file exists, then need to retrieve from other active clients
 func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
-	// TODO:
-	// 1. Check file name
 	if !validFileName(fname) {
 		return nil, BadFilenameError(fname)
 	}
-	// 2. Notify server and wait for response that file is registered
-	fi := FileInfo{user: myUser, fm: mode}
+
+	fi := FileInfo{User: myUser, Name: fname, Fmode: mode}
 	reply := false
+	// TODO: need to watch cases where server is down when calling connToServer
 	err = connToServer.Call("ServerRPC.RegisterFile", fi, &reply)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. Then create dfsFileObject and return to user if new file
 	path := ".." + myUser.LocalPath + fname + ".dfs"
 	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
 	newFile, err := os.Create(path)
@@ -209,8 +208,8 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 		return nil, err
 	}
 
+	// TODO: may need to export this
 	dfsFile := dfsFileObject{fd: newFile, fm: mode}
-	// 3.1 Retrieve latest copy from other clients if pre-existing file TODO:
 
 	return dfsFile, err
 }
@@ -225,7 +224,7 @@ func (dfs dfsObject) UMountDFS() (err error) {
 	reply := false
 	err = connToServer.Call("ServerRPC.Unregister", myUser, &reply)
 	connToServer.Close()
-	connToServer, theDFSInstance = nil, nil
+	theDFSInstance = nil
 	return err
 }
 
@@ -284,7 +283,9 @@ func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
  Throws:
 */
 func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
-	// TODO:
+	if f.fm == READ {
+		return BadFileModeError("READ")
+	}
 	return NotImplementedError("DFSFile.Write")
 }
 
@@ -330,7 +331,7 @@ func (e OpenWriteConflictError) Error() string {
 }
 
 // Contains file mode that is bad.
-type BadFileModeError FileMode
+type BadFileModeError string
 
 func (e BadFileModeError) Error() string {
 	return fmt.Sprintf("DFS: Cannot perform this operation in current file mode [%s]", string(e))

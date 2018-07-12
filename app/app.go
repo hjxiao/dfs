@@ -8,6 +8,8 @@ import (
 	"../dfslib"
 )
 
+type Chunk = dfslib.Chunk
+
 var (
 	serverAddr = "127.0.0.1:3000"
 	myAddr     = "127.0.0.1:3001"
@@ -24,6 +26,14 @@ func main() {
 	fmt.Println("File <picture> exists, ", bool2)
 	bool3, err := dfs.LocalFileExists("gibberish.dfs")
 	fmt.Println("File <gibberish> exists, ", bool3)
+
+	f, err := dfs.Open("openTest", 1)
+	exitOnError(err)
+	var c Chunk
+	const str = "Hello world!"
+	copy(c[:], str)
+	err = f.Write(0, &c)
+	exitOnError(err)
 
 	time.Sleep(7500 * time.Millisecond)
 	err = dfs.UMountDFS()
