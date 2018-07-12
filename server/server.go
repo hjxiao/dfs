@@ -203,32 +203,14 @@ func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
  Throws:
 */
 func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
-	fmt.Println("@@1")
-	if files[fi.Name] == nil {
-		fs := FileState{fileExists: true,
-			isLockedForWrite: false,
-			writeAccess:      &sync.Mutex{},
-			chunkVersion:     make([]*FileVersionOwners, 256)}
+	createFileIfNotExist(fi)
 
-		files[fi.Name] = &fs
+	err = configureWriteAccess(fi)
+	if err != nil {
+		return err
 	}
-	fmt.Println("@@2")
-	if fi.Fmode == WRITE {
-		if files[fi.Name].isLockedForWrite == true {
-			return OpenWriteConflictError(fi.Name)
-		}
-		files[fi.Name].isLockedForWrite = true
-		files[fi.Name].writeAccess.Lock()
-	}
-	fmt.Println("@@3")
-	if filesOpened[fi.User] == nil {
-		filesOpened[fi.User] = make(map[string]FileMode, 0)
-	} else {
-		filesOpened[fi.User][fi.Name] = fi.Fmode
-	}
-	fmt.Println("@@4")
-	fmt.Println("server: files ", files)
-	fmt.Println("server: filesOpened ", filesOpened)
+
+	updateOpenedFiles(fi)
 	return nil
 }
 
@@ -290,8 +272,15 @@ func userEquals(u, ru UserInfo) bool {
  Returns
  Throws:
 */
-func createFileIfNotExist() {
+func createFileIfNotExist(fi FileInfo) {
+	if files[fi.Name] == nil {
+		fs := FileState{fileExists: true,
+			isLockedForWrite: false,
+			writeAccess:      &sync.Mutex{},
+			chunkVersion:     make([]*FileVersionOwners, 256)}
 
+		files[fi.Name] = &fs
+	}
 }
 
 /*
@@ -300,8 +289,16 @@ func createFileIfNotExist() {
  Returns
  Throws:
 */
-func configureWriteAccess() {
+func configureWriteAccess(fi FileInfo) error {
+	if fi.Fmode == WRITE {
+		if files[fi.Name].isLockedForWrite == true {
+			return OpenWriteConflictError(fi.Name)
+		}
+		files[fi.Name].isLockedForWrite = true
+		files[fi.Name].writeAccess.Lock()
+	}
 
+	return nil
 }
 
 /*
@@ -310,8 +307,12 @@ func configureWriteAccess() {
  Returns
  Throws:
 */
-func updateOpenedFiles() {
-
+func updateOpenedFiles(fi FileInfo) {
+	if filesOpened[fi.User] == nil {
+		filesOpened[fi.User] = make(map[string]FileMode, 0)
+	} else {
+		filesOpened[fi.User][fi.Name] = fi.Fmode
+	}
 }
 
 //==================================================================
