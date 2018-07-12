@@ -193,20 +193,8 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 		return nil, BadFilenameError(fname)
 	}
 
-	fi := FileInfo{User: myUser, Name: fname, Fmode: mode}
-	reply := false
-	// TODO: need to watch cases where server is down when calling connToServer
-	err = connToServer.Call("ServerRPC.RegisterFile", fi, &reply)
-	if err != nil {
-		return nil, err
-	}
-
-	path := ".." + myUser.LocalPath + fname + ".dfs"
-	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
-	newFile, err := os.Create(path)
-	if err != nil {
-		return nil, err
-	}
+	err = registerFile(fname, mode)
+	newFile, err := createFile(fname)
 
 	// TODO: may need to export this
 	dfsFile := dfsFileObject{fd: newFile, fm: mode}
@@ -259,6 +247,41 @@ func isAlphaNumeric(str string) bool {
 		}
 	}
 	return true
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func registerFile(name string, mode FileMode) error {
+	fi := FileInfo{User: myUser, Name: name, Fmode: mode}
+	reply := false
+	// TODO: need to watch cases where server is down when calling connToServer
+	err := connToServer.Call("ServerRPC.RegisterFile", fi, &reply)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func createFile(name string) (f *os.File, err error) {
+	path := ".." + myUser.LocalPath + name + ".dfs"
+	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
+	newFile, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return newFile, nil
 }
 
 //===================================
