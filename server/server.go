@@ -69,6 +69,7 @@ type WriteInfo struct {
 }
 
 type ReadInfo struct {
+	User          UserInfo
 	Fname         string
 	ChunkNum      uint8
 	LocalChunkVer int
@@ -292,9 +293,8 @@ func (s *ServerRPC) WriteFile(wi WriteInfo, reply *bool) (err error) {
 	}
 
 	fvo.version++
-	if !containsUser(wi.User, fvo.owners) {
-		fvo.owners = append(fvo.owners, wi.User)
-	}
+	fvo.owners = make([]UserInfo, 0)
+	fvo.owners = append(fvo.owners, wi.User)
 
 	*reply = true
 	return nil
@@ -321,6 +321,9 @@ func (s *ServerRPC) ReadFile(ri ReadInfo, rv *ReadValue) (err error) {
 		// 		 this version
 	} else {
 		rv.IsNew = false
+		if !containsUser(ri.User, fvo.owners) {
+			fvo.owners = append(fvo.owners, ri.User)
+		}
 	}
 
 	return nil

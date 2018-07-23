@@ -79,6 +79,7 @@ type WriteInfo struct {
 }
 
 type ReadInfo struct {
+	User          UserInfo
 	Fname         string
 	ChunkNum      uint8
 	LocalChunkVer int
@@ -357,7 +358,7 @@ func createFile(name string) (f *os.File, err error) {
  Throws:
 */
 func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
-	ri := ReadInfo{Fname: f.name, ChunkNum: chunkNum, LocalChunkVer: f.chunkVer[chunkNum]}
+	ri := ReadInfo{User: myUser, Fname: f.name, ChunkNum: chunkNum, LocalChunkVer: f.chunkVer[chunkNum]}
 	rv := ReadValue{Chnk: chunk, IsNew: false}
 
 	// TODO: check connToServer is not nil
