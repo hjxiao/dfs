@@ -20,6 +20,8 @@ const (
 	hbInterval = 5000 // defines heartbeat interval in milliseconds
 )
 
+type Chunk [32]byte
+
 type FileMode int
 
 // Files may be opened in any of the modes enumerated below
@@ -59,6 +61,12 @@ type UserInfo struct {
 	LocalPath string
 }
 
+type WriteInfo struct {
+	User     UserInfo
+	Fname    string
+	ChunkNum uint8
+}
+
 type ServerRPC int
 
 type ServerInterface interface {
@@ -68,6 +76,7 @@ type ServerInterface interface {
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
 	FileExists(fname string, reply *bool) (err error)
 	RegisterFile(fi FileInfo, reply *bool) (err error)
+	WriteFile(wi WriteInfo, reply *bool) (err error)
 	CloseFile(fi FileInfo, reply *bool) (err error)
 }
 
@@ -230,6 +239,24 @@ func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
 	}
 
 	updateOpenedFiles(fi)
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) WriteFile(wi WriteInfo, reply *bool) (err error) {
+	fvo := files[wi.Fname].chunkVersion
+	fv := fvo[wi.ChunkNum]
+	fv.version++
+	if !containsUser(wi.User, registeredUsers) {
+		registeredUsers = append(registeredUsers, wi.User)
+	}
+
+	*reply = true
 	return nil
 }
 

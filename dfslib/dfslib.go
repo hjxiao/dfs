@@ -45,9 +45,10 @@ type DFSFile interface {
 }
 
 type dfsFileObject struct {
-	fd   *os.File
-	fm   FileMode
-	name string
+	fd       *os.File
+	fm       FileMode
+	name     string
+	chunkVer [256]int
 }
 
 type DFS interface {
@@ -68,6 +69,12 @@ type FileInfo struct {
 	User  UserInfo
 	Name  string
 	Fmode FileMode
+}
+
+type WriteInfo struct {
+	User     UserInfo
+	Fname    string
+	ChunkNum uint8
 }
 
 /*
@@ -277,6 +284,8 @@ func createFile(name string) (f *os.File, err error) {
 	path := myUser.LocalPath + name + ".dfs"
 	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
 	newFile, err := os.Create(path)
+	var c Chunk
+	newFile.Truncate(int64(len(c) * 256))
 	if err != nil {
 		return nil, err
 	}
@@ -313,8 +322,20 @@ func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 	}
 
 	fmt.Println("dfslib: Write to file name ", f.name)
+	wi := WriteInfo{User: myUser, Fname: f.name, ChunkNum: chunkNum}
+	// TODO: check connToServer not nil
+	reply := false
+	err = connToServer.Call("ServerRPC.WriteFile", wi, &reply)
 
-	return NotImplementedError("DFSFile.Write")
+	if reply {
+		f.chunkVer[chunkNum]++
+		c := *chunk
+		pos := len(c) * int(chunkNum)
+		f.fd.Seek(int64(pos), 0)
+		f.fd.Write(c[:])
+	}
+
+	return err
 }
 
 /*
