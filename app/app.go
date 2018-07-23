@@ -13,7 +13,7 @@ type Chunk = dfslib.Chunk
 var (
 	serverAddr = "127.0.0.1:3000"
 	myAddr     = "127.0.0.1:3001"
-	path       = "../tmp/" // The directory is assumed to exist at the same level as dfslib
+	path       = "../tmp/" // The file path is specified relative to dfslib.go
 )
 
 func main() {
@@ -34,6 +34,8 @@ func main() {
 	copy(c[:], str)
 	err = f.Write(0, &c)
 	fmt.Println(err.Error())
+
+	time.Sleep(10000 * time.Millisecond)
 
 	err = f.Close()
 	exitOnError(err)

@@ -66,6 +66,7 @@ type ServerInterface interface {
 	Register(user UserInfo, reply *bool) (err error)
 	Unregister(user UserInfo, reply *bool) (err error)
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
+	FileExists(fname string, reply *bool) (err error)
 	RegisterFile(fi FileInfo, reply *bool) (err error)
 	CloseFile(fi FileInfo, reply *bool) (err error)
 }
@@ -194,6 +195,23 @@ func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
 	fmt.Println("server: Received heartbeat from: ", user)
 	lastHeartBeat[user] = time.Now()
 	*reply = true
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) FileExists(fname string, reply *bool) (err error) {
+	fs := files[fname]
+	if fs == nil {
+		*reply = false
+	} else {
+		fmt.Println("server: File existence ", fs.fileExists)
+		*reply = fs.fileExists
+	}
 	return nil
 }
 

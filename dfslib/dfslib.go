@@ -26,8 +26,6 @@ type FileMode int
 const (
 	READ  FileMode = 1
 	WRITE FileMode = 2
-	// Disconnected read is currently not supported
-	DREAD FileMode = 3
 )
 
 const (
@@ -178,8 +176,9 @@ func (dfs dfsObject) LocalFileExists(fname string) (exists bool, err error) {
  Throws:
 */
 func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
-	// TODO:
-	return false, NotImplementedError("DFS.GlobalFileExists")
+	reply := false
+	err = connToServer.Call("ServerRPC.FileExists", fname, &reply)
+	return reply, err
 }
 
 /*
