@@ -77,6 +77,17 @@ type WriteInfo struct {
 	ChunkNum uint8
 }
 
+type ReadInfo struct {
+	Fname         string
+	ChunkNum      uint8
+	LocalChunkVer int
+}
+
+type ReadValue struct {
+	Chnk  *Chunk
+	IsNew bool
+}
+
 /*
  Purpose:
  Params:
@@ -304,8 +315,21 @@ func createFile(name string) (f *os.File, err error) {
  Throws:
 */
 func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
-	// TODO:
-	return NotImplementedError("DFSFile.Read")
+	ri := ReadInfo{Fname: f.name, ChunkNum: chunkNum, LocalChunkVer: f.chunkVer[chunkNum]}
+	rv := ReadValue{Chnk: chunk, IsNew: false}
+
+	// TODO: check connToServer is not nil
+	err = connToServer.Call("ServerRPC.ReadFile", ri, &rv)
+
+	if !rv.IsNew {
+		c := *chunk
+		pos := len(c) * int(chunkNum)
+		fmt.Println("Read at pos: ", pos)
+		f.fd.Seek(int64(pos), 0)
+		f.fd.Read(chunk[:])
+	}
+
+	return nil
 }
 
 /*
@@ -321,7 +345,7 @@ func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 		return WriteModeTimeoutError(f.name)
 	}
 
-	fmt.Println("dfslib: Write to file name ", f.name)
+	fmt.Printf("dfslib: Writing to file [%s]\n", f.name)
 	wi := WriteInfo{User: myUser, Fname: f.name, ChunkNum: chunkNum}
 	// TODO: check connToServer not nil
 	reply := false
@@ -329,10 +353,13 @@ func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 
 	if reply {
 		f.chunkVer[chunkNum]++
+		fmt.Println("dfslib version: ", f.chunkVer[chunkNum])
 		c := *chunk
 		pos := len(c) * int(chunkNum)
+		fmt.Println("Read at pos: ", pos)
 		f.fd.Seek(int64(pos), 0)
-		f.fd.Write(c[:])
+		f.fd.Write(chunk[:])
+		err = f.fd.Sync()
 	}
 
 	return err

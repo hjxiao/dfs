@@ -27,13 +27,19 @@ func main() {
 	bool3, err := dfs.LocalFileExists("gibberish.dfs")
 	fmt.Println("File <gibberish> exists, ", bool3)
 
-	f, err := dfs.Open("openTest", 1)
+	f, err := dfs.Open("openTest", 2)
 	exitOnError(err)
 	var c Chunk
 	const str = "Hello world!"
 	copy(c[:], str)
-	err = f.Write(0, &c)
-	fmt.Println(err.Error())
+	fmt.Println("Writing chunk: ", c)
+	err = f.Write(3, &c)
+	exitOnError(err)
+
+	var c2 Chunk
+	err = f.Read(3, &c2)
+	exitOnError(err)
+	fmt.Println("Read chunk: ", c2)
 
 	time.Sleep(10000 * time.Millisecond)
 

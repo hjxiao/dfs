@@ -67,6 +67,17 @@ type WriteInfo struct {
 	ChunkNum uint8
 }
 
+type ReadInfo struct {
+	Fname         string
+	ChunkNum      uint8
+	LocalChunkVer int
+}
+
+type ReadValue struct {
+	Chnk  *Chunk
+	IsNew bool
+}
+
 type ServerRPC int
 
 type ServerInterface interface {
@@ -77,6 +88,7 @@ type ServerInterface interface {
 	FileExists(fname string, reply *bool) (err error)
 	RegisterFile(fi FileInfo, reply *bool) (err error)
 	WriteFile(wi WriteInfo, reply *bool) (err error)
+	ReadFile(ri ReadInfo, rv *ReadValue) (err error)
 	CloseFile(fi FileInfo, reply *bool) (err error)
 }
 
@@ -249,14 +261,47 @@ func (s *ServerRPC) RegisterFile(fi FileInfo, reply *bool) (err error) {
  Throws:
 */
 func (s *ServerRPC) WriteFile(wi WriteInfo, reply *bool) (err error) {
-	fvo := files[wi.Fname].chunkVersion
-	fv := fvo[wi.ChunkNum]
-	fv.version++
-	if !containsUser(wi.User, registeredUsers) {
-		registeredUsers = append(registeredUsers, wi.User)
+	fs := files[wi.Fname]
+	cv := fs.chunkVersion
+	fvo := cv[wi.ChunkNum]
+
+	if fvo == nil {
+		fvo = &FileVersionOwners{version: 0, owners: make([]UserInfo, 0)}
+		cv[wi.ChunkNum] = fvo
+	}
+
+	fvo.version++
+	if !containsUser(wi.User, fvo.owners) {
+		fvo.owners = append(fvo.owners, wi.User)
 	}
 
 	*reply = true
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) ReadFile(ri ReadInfo, rv *ReadValue) (err error) {
+	fs := files[ri.Fname]
+	cv := fs.chunkVersion
+	fvo := cv[ri.ChunkNum]
+
+	if fvo == nil {
+		fvo = &FileVersionOwners{version: 0, owners: make([]UserInfo, 0)}
+		cv[ri.ChunkNum] = fvo
+	}
+
+	if ri.LocalChunkVer < fvo.version {
+		// TODO: Request newer version from owner and return to
+		// 		 this version
+	} else {
+		rv.IsNew = false
+	}
+
 	return nil
 }
 
