@@ -9,6 +9,7 @@ package dfslib
 
 import (
 	"fmt"
+	"net"
 	"net/rpc"
 	"os"
 	"strings"
@@ -144,6 +145,7 @@ func connectToServer(sAddr string, user UserInfo) error {
 		}
 
 		go keepAlive(user)
+		establishReverseRPC(user)
 	}
 
 	return nil
@@ -167,6 +169,46 @@ func keepAlive(user UserInfo) {
 		}
 
 		time.Sleep(time.Millisecond * hbInterval / 2)
+	}
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func establishReverseRPC(user UserInfo) {
+	go listen(user.LocalIP)
+
+	reply := false
+	err := connToServer.Call("ServerRPC.EstablishReverseRPC", user, &reply)
+	if err != nil {
+		fmt.Printf("dfslib: Unable to establish reverse RPC connection, err [%s]\n", err.Error())
+		os.Exit(0)
+	}
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func listen(cAddr string) {
+	client := new(ClientRPC)
+	clientRPC := rpc.NewServer()
+	clientRPC.Register(client)
+
+	listener, err := net.Listen("tcp", cAddr)
+	if err != nil {
+		fmt.Printf("dfslib: Unable to bind to port [%s] to listen for incoming connection requests\n", cAddr)
+		os.Exit(0)
+	}
+
+	for {
+		conn, _ := listener.Accept()
+		go clientRPC.ServeConn(conn)
 	}
 }
 
@@ -465,4 +507,21 @@ type ClientRPC int
 
 type ClientInterface interface {
 	Ping(stub int, reply *bool) (err error)
+	RetrieveLatestChunk(chunkNum uint8, chunk *Chunk) (err error)
+}
+
+func (c *ClientRPC) Ping(stub int, reply *bool) (err error) {
+	fmt.Println("dfslib: Received ping from server")
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (c *ClientRPC) RetrieveLatestChunk(chunkNum uint8, chunk *Chunk) (err error) {
+	// TODO:
+	return nil
 }

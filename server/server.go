@@ -34,6 +34,7 @@ var (
 	ipPort          string
 	files           map[string]*FileState            // Assumption: global namespace, all file names are unique
 	filesOpened     map[UserInfo]map[string]FileMode // Assumption: files cannot be deleted after opening
+	clientConns     map[UserInfo]*rpc.Client
 	registeredUsers []UserInfo
 	lastHeartBeat   map[UserInfo]time.Time
 )
@@ -85,6 +86,7 @@ type ServerInterface interface {
 	Register(user UserInfo, reply *bool) (err error)
 	Unregister(user UserInfo, reply *bool) (err error)
 	SendHeartbeat(user UserInfo, reply *bool) (err error)
+	EstablishReverseRPC(user UserInfo, reply *bool) (err error)
 	FileExists(fname string, reply *bool) (err error)
 	RegisterFile(fi FileInfo, reply *bool) (err error)
 	WriteFile(wi WriteInfo, reply *bool) (err error)
@@ -99,6 +101,7 @@ func main() {
 
 	files = make(map[string]*FileState, 0)
 	filesOpened = make(map[UserInfo]map[string]FileMode, 0)
+	clientConns = make(map[UserInfo]*rpc.Client, 0)
 	lastHeartBeat = make(map[UserInfo]time.Time, 0)
 
 	server := new(ServerRPC)
@@ -216,6 +219,24 @@ func (s *ServerRPC) SendHeartbeat(user UserInfo, reply *bool) (err error) {
 	fmt.Println("server: Received heartbeat from: ", user)
 	lastHeartBeat[user] = time.Now()
 	*reply = true
+	return nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (s *ServerRPC) EstablishReverseRPC(user UserInfo, reply *bool) (err error) {
+	clientConns[user], err = rpc.Dial("tcp", user.LocalIP)
+	if err != nil {
+		return err
+	}
+
+	r := false
+	clientConns[user].Call("ClientRPC.Ping", 0, &r)
+
 	return nil
 }
 
