@@ -306,11 +306,14 @@ func (f dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
  Throws:
 */
 func (f dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
-	fmt.Println("dfslib: Write to file name ", f.fd.Name())
-	// TODO:
 	if f.fm == READ {
 		return BadFileModeError("READ")
+	} else if connToServer == nil {
+		return WriteModeTimeoutError(f.name)
 	}
+
+	fmt.Println("dfslib: Write to file name ", f.name)
+
 	return NotImplementedError("DFSFile.Write")
 }
 
