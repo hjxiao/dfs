@@ -225,9 +225,9 @@ func listen(cAddr string) {
  Throws:
 */
 func (dfs dfsObject) LocalFileExists(fname string) (exists bool, err error) {
-	path := strings.Replace(myUser.LocalPath, "/", "", 2)
-	fmt.Println("dfslib: checking path ../" + path + "/" + fname)
-	exists = checkLocalPathOK("../" + path + "/" + fname)
+	path := myUser.LocalPath + fname + ".dfs"
+	fmt.Printf("dfslib: checking path: [%s]\n", path)
+	exists = checkLocalPathOK(path)
 	return exists, nil
 }
 
