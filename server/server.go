@@ -76,8 +76,9 @@ type ReadInfo struct {
 }
 
 type ReadValue struct {
-	Chnk  *Chunk
-	IsNew bool
+	Chnk           *Chunk
+	IsNew          bool
+	globalChunkVer int
 }
 
 type ServerRPC int
@@ -293,6 +294,7 @@ func (s *ServerRPC) WriteFile(wi WriteInfo, reply *bool) (err error) {
 	}
 
 	fvo.version++
+	fmt.Println("server ver: ", fvo.version)
 	fvo.owners = make([]UserInfo, 0)
 	fvo.owners = append(fvo.owners, wi.User)
 
@@ -316,14 +318,32 @@ func (s *ServerRPC) ReadFile(ri ReadInfo, rv *ReadValue) (err error) {
 		cv[ri.ChunkNum] = fvo
 	}
 
+	fmt.Println("local ver: ", ri.LocalChunkVer)
+	fmt.Println("latest ver: ", fvo.version)
+
 	if ri.LocalChunkVer < fvo.version {
-		// TODO: Request newer version from owner and return to
-		// 		 this version
+		fmt.Println("@@")
+		for _, user := range fvo.owners {
+			readInfoForRetrievingChunk := ReadInfo{User: user, Fname: ri.Fname, ChunkNum: ri.ChunkNum}
+			err = retrieveLatestChunk(readInfoForRetrievingChunk, rv)
+			if err != nil {
+				continue
+			} else {
+				rv.globalChunkVer = fvo.version
+				break
+			}
+		}
+
+		if rv.IsNew != true {
+			return ChunkUnavailableError(ri.ChunkNum)
+		}
+
 	} else {
 		rv.IsNew = false
-		if !containsUser(ri.User, fvo.owners) {
-			fvo.owners = append(fvo.owners, ri.User)
-		}
+	}
+
+	if !containsUser(ri.User, fvo.owners) {
+		fvo.owners = append(fvo.owners, ri.User)
 	}
 
 	return nil
@@ -446,9 +466,37 @@ func updateOpenedFiles(fi FileInfo) {
 	filesOpened[fi.User][fi.Name] = fi.Fmode
 }
 
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func retrieveLatestChunk(ri ReadInfo, rv *ReadValue) (err error) {
+	connToClient := clientConns[ri.User]
+
+	if containsUser(ri.User, registeredUsers) && connToClient != nil {
+		err = connToClient.Call("clientRPC.RetrieveLatestChunk", ri, rv)
+		if err != nil {
+			return ChunkUnavailableError(ri.ChunkNum)
+		}
+	} else {
+		return ChunkUnavailableError(ri.ChunkNum)
+	}
+
+	return nil
+}
+
 //==================================================================
 // Errors
 //==================================================================
+
+// Contains chunkNum that is unavailable
+type ChunkUnavailableError uint8
+
+func (e ChunkUnavailableError) Error() string {
+	return fmt.Sprintf("DFS: Latest verson of chunk [%d] unavailable", e)
+}
 
 // A user is identified by their IP, port, and file path
 type UserRegistrationError string
