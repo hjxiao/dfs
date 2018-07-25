@@ -27,6 +27,7 @@ type FileMode int
 const (
 	READ  FileMode = 1
 	WRITE FileMode = 2
+	DREAD FileMode = 3
 )
 
 const (
@@ -42,6 +43,7 @@ var (
 type DFSFile interface {
 	Read(chunkNum uint8, chunk *Chunk) (err error)
 	Write(chunkNum uint8, chunk *Chunk) (err error)
+	Dread(chunkNum uint8, chunk *Chunk) (err error)
 	Close() (err error)
 }
 
@@ -251,6 +253,8 @@ func (dfs dfsObject) GlobalFileExists(fname string) (exists bool, err error) {
 */
 // TODO: if file exists, then need to retrieve from other active clients
 func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
+	var file *os.File
+
 	if !validFileName(fname) {
 		return nil, BadFilenameError(fname)
 	}
@@ -259,10 +263,19 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	if err != nil {
 		return nil, err
 	}
-	newFile, err := createFile(fname)
+
+	if mode == DREAD {
+		file, err = openExistingFile(fname)
+
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		file, err = createFile(fname)
+	}
 
 	// TODO: may need to export this
-	dfsFile := dfsFileObject{fd: newFile, fm: mode, name: fname}
+	dfsFile := dfsFileObject{fd: file, fm: mode, name: fname}
 
 	return &dfsFile, err
 }
@@ -341,14 +354,36 @@ func registerFile(name string, mode FileMode) error {
 func createFile(name string) (f *os.File, err error) {
 	path := myUser.LocalPath + name + ".dfs"
 	fmt.Printf("dfslib: Creating file at path [%s]\n", path)
-	newFile, err := os.Create(path)
+	f, err = os.Create(path)
 	var c Chunk
-	newFile.Truncate(int64(len(c) * 256))
+	f.Truncate(int64(len(c) * 256))
 	if err != nil {
 		return nil, err
 	}
 
-	return newFile, nil
+	return f, nil
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func openExistingFile(name string) (f *os.File, err error) {
+	path := myUser.LocalPath + name + ".dfs"
+	fmt.Printf("dfslib: Opening file at path [%s]\n", path)
+
+	if !checkLocalPathOK(path) {
+		return nil, FileUnavailableError(name)
+	}
+
+	f, err = os.Open(path)
+	if err != nil {
+		return nil, FileUnavailableError(name)
+	}
+
+	return f, nil
 }
 
 //===================================
@@ -380,7 +415,6 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 		f.fd.Seek(int64(pos), 0)
 		f.fd.Write(chunk[:])
 		err = f.fd.Sync()
-		// TODO: chunk = rv.Chnk
 	} else {
 		c := *chunk
 		pos := len(c) * int(chunkNum)
@@ -400,6 +434,8 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 func (f *dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 	if f.fm == READ {
 		return BadFileModeError("READ")
+	} else if f.fm == DREAD {
+		return BadFileModeError("DREAD")
 	} else if connToServer == nil {
 		return WriteModeTimeoutError(f.name)
 	}
@@ -418,6 +454,27 @@ func (f *dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 		f.fd.Write(chunk[:])
 		err = f.fd.Sync()
 	}
+
+	return err
+}
+
+/*
+ Purpose:
+ Params:
+ Returns
+ Throws:
+*/
+func (f *dfsFileObject) Dread(chunkNum uint8, chunk *Chunk) (err error) {
+	if f.fm == READ {
+		return BadFileModeError("READ")
+	} else if f.fm == WRITE {
+		return BadFileModeError("WRITE")
+	}
+
+	c := *chunk
+	pos := len(c) * int(chunkNum)
+	f.fd.Seek(int64(pos), 0)
+	_, err = f.fd.Read(chunk[:])
 
 	return err
 }

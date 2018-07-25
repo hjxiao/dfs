@@ -28,6 +28,7 @@ type FileMode int
 const (
 	READ  FileMode = 1
 	WRITE FileMode = 2
+	DREAD FileMode = 3
 )
 
 var (
