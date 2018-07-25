@@ -86,7 +86,7 @@ type ReadInfo struct {
 }
 
 type ReadValue struct {
-	Chnk           *Chunk
+	Chnk           Chunk
 	IsNew          bool
 	globalChunkVer int
 }
@@ -256,6 +256,9 @@ func (dfs dfsObject) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	}
 
 	err = registerFile(fname, mode)
+	if err != nil {
+		return nil, err
+	}
 	newFile, err := createFile(fname)
 
 	// TODO: may need to export this
@@ -362,13 +365,17 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 	fmt.Println("abc: ", chunkNum)
 	fmt.Println("abc: ", f.chunkVer[chunkNum])
 	ri := ReadInfo{User: myUser, Fname: f.name, ChunkNum: chunkNum, LocalChunkVer: f.chunkVer[chunkNum]}
-	rv := ReadValue{Chnk: chunk, IsNew: false}
+	rv := ReadValue{IsNew: false}
 
 	// TODO: check connToServer is not nil
 	err = connToServer.Call("ServerRPC.ReadFile", ri, &rv)
+	if err != nil {
+		return err
+	}
 
 	if rv.IsNew {
 		f.chunkVer[chunkNum] = rv.globalChunkVer
+		*chunk = rv.Chnk
 
 		c := *chunk
 		pos := len(c) * int(chunkNum)
@@ -385,7 +392,7 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 		f.fd.Read(chunk[:])
 	}
 
-	return err
+	return nil
 }
 
 /*
@@ -522,7 +529,7 @@ type ClientRPC int
 
 type ClientInterface interface {
 	Ping(stub int, reply *bool) (err error)
-	RetrieveLatestChunk(ri ReadInfo, rv *ReadValue) (err error)
+	RetrieveLatestChunk(ri ReadInfo, chunk *Chunk) (err error)
 }
 
 func (c *ClientRPC) Ping(stub int, reply *bool) (err error) {
@@ -536,17 +543,24 @@ func (c *ClientRPC) Ping(stub int, reply *bool) (err error) {
  Returns
  Throws:
 */
-func (c *ClientRPC) RetrieveLatestChunk(ri ReadInfo, rv *ReadValue) (err error) {
+func (c *ClientRPC) RetrieveLatestChunk(ri ReadInfo, chunk *Chunk) (err error) {
 	path := myUser.LocalPath + ri.Fname + ".dfs"
 	f, err := os.Open(path)
+	if err != nil {
+		return ChunkUnavailableError(ri.ChunkNum)
+	}
 
-	chnk := rv.Chnk
-	pos := len(chnk) * int(ri.ChunkNum)
+	pos := len(chunk) * int(ri.ChunkNum)
 	fmt.Println("Read new ver at pos: ", pos)
 	f.Seek(int64(pos), 0)
-	f.Read(rv.Chnk[:])
-
-	rv.IsNew = true
+	fmt.Println("@@3")
+	nBytes, err := f.Read(chunk[:])
+	if err != nil {
+		fmt.Println("read err: ", err.Error())
+	} else {
+		fmt.Println("bytes read: ", nBytes)
+	}
+	fmt.Println("@@4")
 	f.Close()
 	return nil
 }

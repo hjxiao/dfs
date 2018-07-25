@@ -42,7 +42,15 @@ func main() {
 	exitOnError(err)
 	fmt.Println("Read chunk from file: ", c2)
 
-	time.Sleep(10000 * time.Millisecond)
+	var c3 Chunk
+	const str2 = "Testing stale read"
+	copy(c3[:], str2)
+	fmt.Println("Writing chunk to file: ", c3)
+	err = f.Write(10, &c3)
+	err = f.Write(10, &c3)
+	exitOnError(err)
+
+	time.Sleep(20000 * time.Millisecond)
 
 	err = f.Close()
 	exitOnError(err)

@@ -26,7 +26,19 @@ func main() {
 	bool2, err := dfs.GlobalFileExists("openTest")
 	fmt.Println("File <openTest> exists, ", bool2)
 
-	time.Sleep(7500 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
+
+	_, err = dfs.Open("openTest", 2)
+	fmt.Println("Expecting error: ", err.Error())
+
+	f, err := dfs.Open("openTest", 1)
+	exitOnError(err)
+
+	var c Chunk
+	err = f.Read(10, &c)
+	exitOnError(err)
+	fmt.Println("Read chunk from file: ", c)
+
 	err = dfs.UMountDFS()
 	exitOnError(err)
 

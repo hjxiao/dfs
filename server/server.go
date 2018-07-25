@@ -76,7 +76,7 @@ type ReadInfo struct {
 }
 
 type ReadValue struct {
-	Chnk           *Chunk
+	Chnk           Chunk
 	IsNew          bool
 	globalChunkVer int
 }
@@ -325,19 +325,17 @@ func (s *ServerRPC) ReadFile(ri ReadInfo, rv *ReadValue) (err error) {
 		fmt.Println("@@")
 		for _, user := range fvo.owners {
 			readInfoForRetrievingChunk := ReadInfo{User: user, Fname: ri.Fname, ChunkNum: ri.ChunkNum}
-			err = retrieveLatestChunk(readInfoForRetrievingChunk, rv)
+			newChunk, err := retrieveLatestChunk(readInfoForRetrievingChunk)
 			if err != nil {
+				fmt.Println("uh oh, error")
 				continue
 			} else {
+				rv.Chnk = newChunk
 				rv.globalChunkVer = fvo.version
+				rv.IsNew = true
 				break
 			}
 		}
-
-		if rv.IsNew != true {
-			return ChunkUnavailableError(ri.ChunkNum)
-		}
-
 	} else {
 		rv.IsNew = false
 	}
@@ -472,19 +470,22 @@ func updateOpenedFiles(fi FileInfo) {
  Returns
  Throws:
 */
-func retrieveLatestChunk(ri ReadInfo, rv *ReadValue) (err error) {
+func retrieveLatestChunk(ri ReadInfo) (c Chunk, err error) {
 	connToClient := clientConns[ri.User]
 
 	if containsUser(ri.User, registeredUsers) && connToClient != nil {
-		err = connToClient.Call("clientRPC.RetrieveLatestChunk", ri, rv)
+		err = connToClient.Call("ClientRPC.RetrieveLatestChunk", ri, &c)
+		fmt.Println("server asked for chunk: ", c)
 		if err != nil {
-			return ChunkUnavailableError(ri.ChunkNum)
+			fmt.Println("We shouldn't be in here...")
+			return c, ChunkUnavailableError(ri.ChunkNum)
 		}
 	} else {
-		return ChunkUnavailableError(ri.ChunkNum)
+		return c, ChunkUnavailableError(ri.ChunkNum)
 	}
 
-	return nil
+	fmt.Println("we should be here")
+	return c, nil
 }
 
 //==================================================================
