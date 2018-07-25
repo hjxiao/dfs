@@ -362,8 +362,6 @@ func createFile(name string) (f *os.File, err error) {
  Throws:
 */
 func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
-	fmt.Println("abc: ", chunkNum)
-	fmt.Println("abc: ", f.chunkVer[chunkNum])
 	ri := ReadInfo{User: myUser, Fname: f.name, ChunkNum: chunkNum, LocalChunkVer: f.chunkVer[chunkNum]}
 	rv := ReadValue{IsNew: false}
 
@@ -379,7 +377,6 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 
 		c := *chunk
 		pos := len(c) * int(chunkNum)
-		fmt.Println("Updating at pos: ", pos)
 		f.fd.Seek(int64(pos), 0)
 		f.fd.Write(chunk[:])
 		err = f.fd.Sync()
@@ -387,7 +384,6 @@ func (f *dfsFileObject) Read(chunkNum uint8, chunk *Chunk) (err error) {
 	} else {
 		c := *chunk
 		pos := len(c) * int(chunkNum)
-		fmt.Println("Read at pos: ", pos)
 		f.fd.Seek(int64(pos), 0)
 		f.fd.Read(chunk[:])
 	}
@@ -415,12 +411,9 @@ func (f *dfsFileObject) Write(chunkNum uint8, chunk *Chunk) (err error) {
 	err = connToServer.Call("ServerRPC.WriteFile", wi, &reply)
 
 	if reply {
-		//f.chunkVer[chunkNum]++
 		f.chunkVer[chunkNum] = f.chunkVer[chunkNum] + 1
-		fmt.Println("dfslib version: ", f.chunkVer[chunkNum])
 		c := *chunk
 		pos := len(c) * int(chunkNum)
-		fmt.Println("Write at pos: ", pos)
 		f.fd.Seek(int64(pos), 0)
 		f.fd.Write(chunk[:])
 		err = f.fd.Sync()
@@ -551,16 +544,12 @@ func (c *ClientRPC) RetrieveLatestChunk(ri ReadInfo, chunk *Chunk) (err error) {
 	}
 
 	pos := len(chunk) * int(ri.ChunkNum)
-	fmt.Println("Read new ver at pos: ", pos)
 	f.Seek(int64(pos), 0)
-	fmt.Println("@@3")
-	nBytes, err := f.Read(chunk[:])
+	_, err = f.Read(chunk[:])
 	if err != nil {
-		fmt.Println("read err: ", err.Error())
-	} else {
-		fmt.Println("bytes read: ", nBytes)
+		return ChunkUnavailableError(ri.ChunkNum)
 	}
-	fmt.Println("@@4")
+
 	f.Close()
 	return nil
 }

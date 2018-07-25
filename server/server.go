@@ -253,7 +253,7 @@ func (s *ServerRPC) FileExists(fname string, reply *bool) (err error) {
 	if fs == nil {
 		*reply = false
 	} else {
-		fmt.Println("server: File existence ", fs.fileExists)
+		fmt.Println("server: File existence - ", fs.fileExists)
 		*reply = fs.fileExists
 	}
 	return nil
@@ -294,7 +294,6 @@ func (s *ServerRPC) WriteFile(wi WriteInfo, reply *bool) (err error) {
 	}
 
 	fvo.version++
-	fmt.Println("server ver: ", fvo.version)
 	fvo.owners = make([]UserInfo, 0)
 	fvo.owners = append(fvo.owners, wi.User)
 
@@ -318,16 +317,11 @@ func (s *ServerRPC) ReadFile(ri ReadInfo, rv *ReadValue) (err error) {
 		cv[ri.ChunkNum] = fvo
 	}
 
-	fmt.Println("local ver: ", ri.LocalChunkVer)
-	fmt.Println("latest ver: ", fvo.version)
-
 	if ri.LocalChunkVer < fvo.version {
-		fmt.Println("@@")
 		for _, user := range fvo.owners {
 			readInfoForRetrievingChunk := ReadInfo{User: user, Fname: ri.Fname, ChunkNum: ri.ChunkNum}
 			newChunk, err := retrieveLatestChunk(readInfoForRetrievingChunk)
 			if err != nil {
-				fmt.Println("uh oh, error")
 				continue
 			} else {
 				rv.Chnk = newChunk
@@ -475,16 +469,13 @@ func retrieveLatestChunk(ri ReadInfo) (c Chunk, err error) {
 
 	if containsUser(ri.User, registeredUsers) && connToClient != nil {
 		err = connToClient.Call("ClientRPC.RetrieveLatestChunk", ri, &c)
-		fmt.Println("server asked for chunk: ", c)
 		if err != nil {
-			fmt.Println("We shouldn't be in here...")
 			return c, ChunkUnavailableError(ri.ChunkNum)
 		}
 	} else {
 		return c, ChunkUnavailableError(ri.ChunkNum)
 	}
 
-	fmt.Println("we should be here")
 	return c, nil
 }
 
