@@ -7,7 +7,7 @@ The file system exposes 2 interfaces to users: (1) the dfs API and (2) dfs file 
 
 Files consist of "chunks", which are length-32 byte arrays. A file contains 256 chunks. Users may read and write with per-chunk granularity. For each file, there may be one writer and many concurrent readers. 
 
-In read and write mode, df guarantees strong consistency. All writes to a file will only occur successfully if the system can guarantee that future reads to this chunk return the updated value. However, if users wish to avoid the latency incurred by this guarantee, they may optionally open the file in disconnected read mode. Disconnected read mode offers users the ability to improve read latency at the expense of potentially stale data. 
+In read and write mode, dfs guarantees strong consistency. All writes to a file will only occur successfully if the system can guarantee that future reads to this chunk return the updated value. However, if users wish to avoid the latency incurred by this guarantee, they may optionally open the file in disconnected read mode. Disconnected read mode offers users the ability to improve read latency at the expense of potentially stale data. 
 
 A single server serializes all file operations from clients participating in the dfs application. File data is cached on each client. No file data is stored on the server. The server maintains a minimal set of metadata regarding each client to facilitate dfs services. 
 
@@ -51,7 +51,7 @@ The dfs application consists of 2 nodes.
   - dfs library layer: The dfslib API exposes several primitives to the user to create, open, and modify ".dfs" files.
 - server node
 
-The client nodes are connected to the server node in a star topological layout. Each client has no knowledge of other clients utilizing the services of the distributed file system. The server transparently mediate communication between each client using bi-directional RPC.
+The client nodes are connected to the server node in a star topological layout. Each client has no knowledge of other clients utilizing the services of the distributed file system. The server transparently mediates communication between each client using bi-directional RPC.
 
 ## dfslib API
 
